@@ -107,7 +107,10 @@ int i2c_v2_configure(uintptr_t base, uint32_t clock, uint32_t baudrate)
     i2c_write(base + V2_TIMINGR, timing);
     i2c_write(base + V2_ICR, CLEAR_FLAGS);
     i2c_write(base + V2_CR1, BIT(0)); /* PE; filters: analog on, digital off */
-    return (i2c_read(base + V2_CR1) & BIT(0)) && i2c_read(base + V2_TIMINGR) == timing ? 0 : -EIO;
+    /* Only PE is read back: TIMINGR is plain read/write storage whose value
+     * was just written, and some models of the peripheral (Renode's
+     * STM32F7_I2C keeps its fields as tags) read it back as zero. */
+    return (i2c_read(base + V2_CR1) & BIT(0)) ? 0 : -EIO;
 }
 
 /**
