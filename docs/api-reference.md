@@ -1,6 +1,6 @@
 # API reference
 
-`dmi2c_validate_config` and `dmi2c_validate_transfer` are exported module APIs.
+Validation is private to the driver; there are no public validator exports.
 Device access uses the dmdrvi 2.0 DIF through `Dmod_FileOpen`, `Dmod_FileRead`,
 `Dmod_FileWrite`, `Dmod_Ioctl` and `Dmod_FileClose`. Driver/handle contexts are
 opaque, heap allocated and magic guarded. dmdevfs owns their lifetime.
@@ -34,7 +34,7 @@ non-const pointer also permits read messages. Buffers must remain valid until
 the synchronous call returns. Zero-length writes are address-only probes;
 zero-length reads are rejected. There is no no-START or no-STOP flag.
 
-The port validates the complete vector before touching hardware. On success,
+The core validates the complete vector before touching hardware. On success,
 all bytes have completed. Errors return a negative errno, not a partial byte
 count. Some bytes may already have reached a target or an RX buffer when an
 error occurs. Do not blindly retry non-idempotent writes.
@@ -74,8 +74,8 @@ work. The device reports size zero and mode 0666.
 | `-ENODEV` | Transfer on an uninitialized controller |
 | `-ENOMEM` | Allocation failed |
 
-The dmdrvi `create` and `open` ABI returns NULL on failure. Configuration errors
-are detected before narrowing integer fields. Port calls return errno directly.
-The transfer deadline starts after acquiring the module lock, covers the whole
-vector, and may be followed by up to 10 ms of STOP cleanup after an error. Lock
+The dmdrvi `create` and `open` ABI returns NULL on failure. Configuration ranges
+are checked before narrowing integer fields using values read by dmini.
+The transfer deadline starts after acquiring the per-bus lock, covers the whole
+vector, and may be followed by up to 10 ms of STOP cleanup after an error. The task sleeps on an OS semaphore while IRQs transfer payload. Lock
 queueing time is additional; callers must not use these functions from ISR.

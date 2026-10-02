@@ -1,71 +1,55 @@
-# Validation and reproduction
+# Testing dmi2c
 
-## Host regressions
+## Loader integration
 
-```sh
-cmake -S tests/host -B build-host -DCMAKE_BUILD_TYPE=Debug
-cmake --build build-host --parallel 2
-ctest --test-dir build-host --output-on-failure
-```
+The native suite runs a test module through dmod_loader. It dynamically loads
+the production dmi2c module and resolves its dmdrvi DIF. dmini and the loader's
+OS services are real dependencies. There are no replacement SAL/dmini/dmosi
+headers or production C files linked directly into a test executable.
 
-The tests compile the production driver and STM32 register engines. Both suites
-pass: `register_protocols` and `driver_contract`. Coverage includes:
-
-- F4 ACK/POS tails and F7 RELOAD at lengths 1, 2, 3, 4, 255, 256, 510 and 511;
-- repeated START, including read followed by write, and address-only probes;
-- NACK, arbitration loss, bus error, overrun, busy bus and total deadlines;
-- reusing a controller after errors, clock ownership and selector restoration;
-- independent register-address expectations for all supported instances;
-- timing constraints at representative APB clocks and both supported baudrates;
-- named INI sections, numeric overflow, invalid configurations, allocation
-  failures, initialization rollback and independent addresses for open handles;
-- dmdrvi read/write/ioctl/stat behavior and propagation of port errors.
-
-AddressSanitizer and UndefinedBehaviorSanitizer can be enabled with:
+A separate test-only dmi2c_port module models the hardware boundary. It provides
+a register device at 0x38, NACK, arbitration loss, bus error and a stalled target.
+A delayed completion uses a real OS thread. This tests the common driver's
+contract; it does not simulate STM32 registers or prove electrical timing.
 
 ```sh
-cmake -S tests/host -B build-host-sanitize \
-  -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-cmake --build build-host-sanitize --parallel 2
-ctest --test-dir build-host-sanitize --output-on-failure
+cmake -S . -B build-loader -DDMI2C_HOST_TESTS=ON -DDMOD_CPU_FAMILY=x86_64
+cmake --build build-loader --parallel 2
+export DMOD_DMF_DIR="$PWD/build-loader/dmf"
+dmf-get install -d tests/runtime.dmd -y
+ctest --test-dir build-loader --output-on-failure
 ```
 
-LeakSanitizer requires an environment that permits its process inspection.
-Mocked registers do not establish electrical timing or replace an F4 board test.
+Select native DMOD_TOOLS_NAME when cross-development defaults differ from the
+host, e.g. arch/aarch64/cortex-a53 on an AArch64 host. Never run an ARM .dmf with
+a native loader. Host simulation is enabled explicitly and never selected by
+hardware-family release discovery.
 
-## Cross compilation
+The suite covers active-section isolation, decimal configuration/ranges, real
+DIF discovery, independent open handles, unknown/null ioctls, vectors, timeout
+cancellation, error propagation, duplicate ownership and reuse after failure.
+Both immediate and deferred completion are checked.
 
-Both `stm32f4` and `stm32f7` builds produce the core, port, API test and
-`i2ctest` modules. See the root README for commands. CI runs the host suites
-and discovers both family directories for ARM builds.
+## Hardware regression
 
-## Connected-board regression
-
-Use STM32F746G-DISCO with its original LCD/touch assembly and the board's
-`i2c3.ini`. GPIO PH7/PH8 are AF4 open-drain; FT5336 is at unshifted address
-0x38. No external peripheral is needed. Run:
+Build the normal stm32f4 or stm32f7 configuration. Install the matching dmi2c,
+dmi2c_port and i2ctest modules and the board INI. On STM32F746G-DISCO:
 
 ```text
-test_dmi2c
 i2ctest /dev/dmi2cx/touch_i2c ft5336
 ```
 
-The hardware regression verifies ID 0x51 at register 0xa8, repeated-START
-reads of 1–4 bytes, a 256-byte read crossing NBYTES/RELOAD, 100 repeated reads,
-independent handle addresses, an unknown ioctl and an expected NACK from 0x77.
-Only register pointers are written. Ensure no target occupies 0x77 before
-running this board-specific test. Run separately with `baudrate=100000` and
-`baudrate=400000` in the INI; the controller must be released and recreated
-(or reboot the firmware) after changing configuration.
+This checks FT5336 ID 0x51, repeated START, read lengths 1–4, a 256-byte transfer,
+100 repeated reads, independent handles, unknown ioctl and NACK from 0x77.
+It writes register pointers only. Ensure no target occupies address 0x77.
+Repeat with baudrate=100000 and 400000, recreating the controller after a change.
 
-The connected F746 board passed this regression at configured 100 kHz and 400 kHz on
-2026-10-02. The final driver binary passed the 400 kHz run, including the
-separate API suite (2/2). This is a functional transfer test, without oscilloscope or logic
-analyzer measurement. F4 and the other board configurations have build/model
-and documented pin-routing coverage, but have not been physically tested.
+The revised interrupt engine passed the full FT5336 regression at configured
+100 kHz and 400 kHz on STM32F746G-DISCO on 2026-10-02, with zero failures.
+The native loader suite passed 8/8 steps. Both F4 and F7 ARM builds passed.
+These are functional results; no scope or logic-analyzer measurement was made.
+F4 has not been physically tested.
 
-When injecting local modules into dmod-boot, replace the matching `.dmf`, remove
-stale `.dmfc` for those modules and rebuild `modules.dmp`; otherwise compressed
-released modules may shadow the local implementation. Preserve the original
-flash before testing and restore it afterward.
+When injecting modules into dmod-boot, remove stale compressed versions of those
+same modules and regenerate modules.dmp. Preserve the existing physical flash
+and generated build artifacts before testing, and restore them afterward.

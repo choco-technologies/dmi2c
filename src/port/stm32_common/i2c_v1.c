@@ -15,14 +15,22 @@
 #define AF BIT(10)
 #define OVR BIT(11)
 
+/**
+ * @brief Configure classic I2C with analog filter and bounded SCL rate.
+ */
 int i2c_v1_configure(uintptr_t base, uint32_t clock, uint32_t baudrate)
 {
     uint32_t mhz = clock / 1000000;
-    if (clock < 2000000 || clock > 50000000 ||
-        (baudrate == 400000 && clock < 4000000)) return -ERANGE;
+    if (clock < 2000000 || clock > 50000000 || (baudrate == 400000 && clock < 4000000))
+    {
+        return -ERANGE;
+    }
     uint32_t divisor = (baudrate == 100000 ? 2 : 3) * baudrate;
     uint32_t ccr = (clock + divisor - 1) / divisor;
-    if (ccr < (baudrate == 100000 ? 4U : 1U) || ccr > 4095) return -ERANGE;
+    if (ccr < (baudrate == 100000 ? 4U : 1U) || ccr > 4095)
+    {
+        return -ERANGE;
+    }
     i2c_write(base + V1_CR1, 0);
     i2c_write(base + V1_CR2, mhz);
     i2c_write(base + V1_OAR1, BIT(14));
@@ -32,136 +40,169 @@ int i2c_v1_configure(uintptr_t base, uint32_t clock, uint32_t baudrate)
     i2c_write(base + V1_CR1, PE | ACK);
     return (i2c_read(base + V1_CR1) & PE) ? 0 : -EIO;
 }
-static int error_status(i2c_transaction_t *t)
+
+/**
+ * @brief Clear ADDR by the required SR1/SR2 read sequence.
+ */
+static void clear_address(stm32_i2c_t *state)
 {
-    uint32_t sr = i2c_read(t->base + V1_SR1);
-    if (sr & ARLO) return -EAGAIN;
-    if (sr & AF) return -ENXIO;
-    if (sr & BERR) return -EIO;
-    if (sr & OVR) return -EOVERFLOW;
-    return 0;
+    (void)i2c_read(state->base + V1_SR1);
+    (void)i2c_read(state->base + V1_SR2);
 }
-static int wait_flag(i2c_transaction_t *t, uint32_t reg, uint32_t mask, bool set)
+
+/**
+ * @brief Terminate a read or write and notify the transaction scheduler.
+ */
+static void finish(stm32_i2c_t *state)
 {
-    for (;;)
+    i2c_modify(state->base + V1_CR1, 0, state->last ? STOP : START);
+    stm32_i2c_complete(state, 0);
+}
+
+/**
+ * @brief Prepare ACK/POS and buffer IRQs before releasing address stretching.
+ */
+static void address_ready(stm32_i2c_t *state)
+{
+    const dmi2c_message_t *message = state->message;
+    if (!message->read)
     {
-        int rc = error_status(t);
-        if (rc) return rc;
-        if (i2c_expired(t)) return -ETIMEDOUT;
-        if (((i2c_read(t->base + reg) & mask) != 0) == set) return 0;
+        clear_address(state);
+        if (message->size == 0)
+        {
+            finish(state);
+        }
+        return;
     }
-}
-static void clear_address(i2c_transaction_t *t)
-{
-    (void)i2c_read(t->base + V1_SR1);
-    (void)i2c_read(t->base + V1_SR2);
-}
-static void finish_message(i2c_transaction_t *t, bool last)
-{
-    i2c_modify(t->base + V1_CR1, 0, last ? STOP : START);
-}
-static int send_address(i2c_transaction_t *t, const dmi2c_message_t *m)
-{
-    i2c_modify(t->base + V1_CR1, POS, ACK);
-    if (!(i2c_read(t->base + V1_CR1) & START) &&
-        !(i2c_read(t->base + V1_SR1) & SB))
-        i2c_modify(t->base + V1_CR1, 0, START);
-    int rc = wait_flag(t, V1_SR1, SB, true);
-    if (rc) return rc;
-    i2c_write(t->base + V1_DR, (m->address << 1) | m->read);
-    return wait_flag(t, V1_SR1, ADDR, true);
-}
-static int transmit(i2c_transaction_t *t, const dmi2c_message_t *m, bool last)
-{
-    clear_address(t);
-    for (size_t i = 0; i < m->size; ++i)
+    Dmod_EnterCritical();
+    if (message->size == 1)
     {
-        int rc = wait_flag(t, V1_SR1, TXE, true);
-        if (rc) return rc;
-        i2c_write(t->base + V1_DR, m->data[i]);
+        i2c_modify(state->base + V1_CR1, ACK, 0);
+        clear_address(state);
+        i2c_modify(state->base + V1_CR1, 0, state->last ? STOP : START);
     }
-    int rc = m->size ? wait_flag(t, V1_SR1, BTF, true) : 0;
-    if (!rc && last) finish_message(t, true);
-    return rc;
-}
-static int receive_one(i2c_transaction_t *t, uint8_t *data, bool last)
-{
-    i2c_modify(t->base + V1_CR1, ACK, 0);
-    Dmod_EnterCritical();
-    clear_address(t);
-    finish_message(t, last);
-    Dmod_ExitCritical();
-    int rc = wait_flag(t, V1_SR1, RXNE, true);
-    if (!rc) *data = i2c_read(t->base + V1_DR);
-    return rc;
-}
-static int receive_last_two(i2c_transaction_t *t, uint8_t *data, bool last)
-{
-    int rc = wait_flag(t, V1_SR1, BTF, true);
-    if (rc) return rc;
-    Dmod_EnterCritical();
-    finish_message(t, last);
-    data[0] = i2c_read(t->base + V1_DR);
-    data[1] = i2c_read(t->base + V1_DR);
-    Dmod_ExitCritical();
-    return 0;
-}
-static int receive_two(i2c_transaction_t *t, uint8_t *data, bool last)
-{
-    i2c_modify(t->base + V1_CR1, 0, POS);
-    Dmod_EnterCritical();
-    clear_address(t);
-    i2c_modify(t->base + V1_CR1, ACK, 0);
-    Dmod_ExitCritical();
-    return receive_last_two(t, data, last);
-}
-static int receive_many(i2c_transaction_t *t, uint8_t *data, size_t size, bool last)
-{
-    clear_address(t);
-    while (size > 3)
+    else if (message->size == 2)
     {
-        int rc = wait_flag(t, V1_SR1, RXNE, true);
-        if (rc) return rc;
-        *data++ = i2c_read(t->base + V1_DR);
-        --size;
-    }
-    int rc = wait_flag(t, V1_SR1, BTF, true);
-    if (rc) return rc;
-    Dmod_EnterCritical();
-    i2c_modify(t->base + V1_CR1, ACK, 0);
-    *data++ = i2c_read(t->base + V1_DR);
-    Dmod_ExitCritical();
-    return receive_last_two(t, data, last);
-}
-static int message(i2c_transaction_t *t, const dmi2c_message_t *m, bool last)
-{
-    int rc = send_address(t, m);
-    if (rc) return rc;
-    if (!m->read) return transmit(t, m, last);
-    if (m->size == 1) return receive_one(t, m->data, last);
-    if (m->size == 2) return receive_two(t, m->data, last);
-    return receive_many(t, m->data, m->size, last);
-}
-int i2c_v1_transfer(i2c_transaction_t *t, const dmi2c_transfer_t *transfer)
-{
-    i2c_write(t->base + V1_SR1, 0); /* Clear sticky errors from preceding ARLO */
-    int rc = wait_flag(t, V1_SR2, BIT(1), false);
-    if (rc) return rc; /* No ownership: do not generate STOP */
-    for (size_t i = 0; !rc && i < transfer->count; ++i)
-        rc = message(t, &transfer->messages[i], i + 1 == transfer->count);
-    if (rc)
-    {
-        if (rc != -EAGAIN && (i2c_read(t->base + V1_SR2) & BIT(0)))
-            finish_message(t, true);
-        i2c_write(t->base + V1_SR1, 0);
-        i2c_transaction_t cleanup = {t->base, Dmod_GetUptime(), 10};
-        while (rc != -EAGAIN && (i2c_read(t->base + V1_CR1) & STOP))
-            if (i2c_expired(&cleanup)) break;
+        i2c_modify(state->base + V1_CR1, 0, POS);
+        clear_address(state);
+        i2c_modify(state->base + V1_CR1, ACK, 0);
     }
     else
     {
-        rc = wait_flag(t, V1_CR1, STOP, false);
-        i2c_modify(t->base + V1_CR1, POS, ACK);
+        clear_address(state);
     }
-    return rc;
+    Dmod_ExitCritical();
+}
+
+/**
+ * @brief Consume RXNE/BTF with the F4 one-, two- and three-byte receive tails.
+ */
+static void receive(stm32_i2c_t *state, uint32_t status)
+{
+    size_t remaining = state->message->size - state->position;
+    uint8_t *data = state->message->data + state->position;
+    if (remaining == 2 && (status & BTF))
+    {
+        Dmod_EnterCritical();
+        i2c_modify(state->base + V1_CR1, 0, state->last ? STOP : START);
+        data[0] = i2c_read(state->base + V1_DR);
+        data[1] = i2c_read(state->base + V1_DR);
+        Dmod_ExitCritical();
+        state->position += 2;
+        stm32_i2c_complete(state, 0);
+    }
+    else if (remaining == 3 && (status & BTF))
+    {
+        Dmod_EnterCritical();
+        i2c_modify(state->base + V1_CR1, ACK, 0);
+        *data = i2c_read(state->base + V1_DR);
+        Dmod_ExitCritical();
+        ++state->position;
+    }
+    else if ((remaining > 3 || remaining == 1) && (status & RXNE))
+    {
+        *data = i2c_read(state->base + V1_DR);
+        ++state->position;
+        if (remaining == 4)
+        {
+            i2c_modify(state->base + V1_CR2, BIT(10), 0);
+        }
+        if (remaining == 1)
+        {
+            stm32_i2c_complete(state, 0);
+        }
+    }
+}
+
+/**
+ * @brief Feed TXE and finish only after the last byte reaches BTF.
+ */
+static void transmit(stm32_i2c_t *state, uint32_t status)
+{
+    if (state->position < state->message->size && (status & TXE))
+    {
+        i2c_write(state->base + V1_DR, state->message->data[state->position++]);
+        if (state->position == state->message->size)
+        {
+            i2c_modify(state->base + V1_CR2, BIT(10), 0);
+        }
+    }
+    else if (state->position == state->message->size && (status & BTF))
+    {
+        finish(state);
+    }
+}
+
+/**
+ * @brief Start or resume after repeated START; no task spins on status flags.
+ */
+void i2c_v1_start(stm32_i2c_t *state)
+{
+    i2c_write(state->base + V1_SR1, 0);
+    i2c_modify(state->base + V1_CR1, POS, ACK);
+    uint32_t interrupts = BIT(8) | BIT(9);
+    if (!state->message->read || state->message->size == 1 || state->message->size > 3)
+    {
+        interrupts |= BIT(10);
+    }
+    if (!(i2c_read(state->base + V1_CR1) & START) && !(i2c_read(state->base + V1_SR1) & SB))
+    {
+        i2c_modify(state->base + V1_CR1, 0, START);
+    }
+    i2c_modify(state->base + V1_CR2, BIT(8) | BIT(9) | BIT(10), interrupts);
+}
+
+/**
+ * @brief Handle one event/error snapshot; errors take priority over payload.
+ */
+void i2c_v1_irq(stm32_i2c_t *state)
+{
+    uint32_t status = i2c_read(state->base + V1_SR1);
+    int result = status & ARLO   ? -EAGAIN
+                 : status & AF   ? -ENXIO
+                 : status & BERR ? -EIO
+                 : status & OVR  ? -EOVERFLOW
+                                 : 0;
+    if (result != 0)
+    {
+        state->arbitration_lost = result == -EAGAIN;
+        i2c_write(state->base + V1_SR1, 0);
+        stm32_i2c_complete(state, result);
+    }
+    else if (status & SB)
+    {
+        i2c_write(state->base + V1_DR, (state->message->address << 1) | state->message->read);
+    }
+    else if (status & ADDR)
+    {
+        address_ready(state);
+    }
+    else if (state->message->read)
+    {
+        receive(state, status);
+    }
+    else
+    {
+        transmit(state, status);
+    }
 }

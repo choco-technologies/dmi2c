@@ -12,8 +12,8 @@ I2C master driver for the DMOD embedded module system, exposed through dmdrvi
 - Board INIs for NUCLEO-F401RE/F411RE/F446RE/F767ZI, STM32F4-DISCOVERY and
   STM32F746G-DISCO, with real GPIO assignments and pull-up requirements.
 
-This version is a polling master driver. Slave mode, 10-bit addressing, DMA,
-asynchronous interrupts, SMBus/PEC and GPIO clock-pulse bus recovery are not
+Payload transfer uses event/error interrupts; callers sleep until completion.
+Slave mode, 10-bit addressing, DMA, SMBus/PEC and GPIO clock-pulse bus recovery are not
 implemented. Reserved/general-call addresses are rejected. Calls require task
 context and a running millisecond uptime clock; configuration assumes stable
 system clocks for the lifetime of the bus. Baudrate is a maximum: conservative
@@ -30,8 +30,8 @@ cmake --build build-f4 --parallel 2
 
 Optionally pass `-DDMOD_DIR=/path/to/dmod`. CMake otherwise fetches the SDK from
 its `develop` branch. Generated modules are under `build-f*/dmf/`; release
-packages include headers, documentation and board configurations. `make`
-wraps these CMake targets; `make DMOD_CPU_FAMILY=stm32f4` selects F4.
+packages include headers, documentation and board configurations. The native Makefile retains the generated DMOD build structure; it does not
+invoke CMake. Supply DMOD_DIR and the normal DMOD Make toolchain settings.
 Dependencies are dynamically linked DMOD modules, with no bundled HAL.
 
 ## Use
@@ -51,33 +51,26 @@ See [API](docs/api-reference.md), [configuration](docs/configuration.md),
 
 ## Tests
 
-Host regression tests compile the production core and both register engines,
-using mocked module services and a register-side peripheral model:
-
-```sh
-cmake -S tests/host -B build-host
-cmake --build build-host
-ctest --test-dir build-host --output-on-failure
-```
-
-`test_dmi2c.dmf` adds API validation checks runnable on a DMOD target.
-`i2ctest` performs actual device transactions; its FT5336 regression requires
-STM32F746G-DISCO hardware. Host simulation does not validate electrical timing
-or substitute for physical-board coverage. See [test report](docs/testing.md).
+Integration tests run actual .dmf modules through dmod_loader, with real dmini,
+dmdrvi ABI and OS services. A test-only port emulates hardware. Use
+-DMI2C_HOST_TESTS=ON for a native build; see [testing](docs/testing.md) for
+commands and coverage. i2ctest performs actual FT5336 transactions on F746G-DISCO.
 
 ## Project structure
 
 ```text
 include/                 public core, types and minimal port API
-src/dmi2c.c              INI parsing, handles, dmdrvi contract
+src/dmi2c.c              handles and dmdrvi contract
+src/config.c             active-section INI configuration
+src/transfer.c           portable sequencing, locks, waits and deadlines
 src/validation.h         shared argument validation
-src/port/stm32_common/   clocks, ownership, locking, F4/F7 register engines
-src/port/stm32f4/        12-line family selector and toolchain configuration
-src/port/stm32f7/        12-line family selector and toolchain configuration
+src/port/stm32_common/   RCC/NVIC and selected F4/F7 IRQ engine
+src/port/stm32f4/        IRQ/lifecycle entries and toolchain configuration
+src/port/stm32f7/        IRQ/lifecycle entries and toolchain configuration
 configs/board/          ready-to-install board GPIO and I2C INIs
 configs/mcu/            controller-only defaults
-tests/host/             core and register-protocol regression tests
-tests/dmi2c_test.c       on-target DMOD API tests
+tests/virtual_port/     test-only loadable hardware model
+tests/dmi2c_test.c       real-loader integration tests
 tools/i2ctest/           explicit probe/register read/hardware regression
 docs/                   API, configuration, ports and validation
 ```

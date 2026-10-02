@@ -7,17 +7,23 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
-  host-regressions:
-    name: Core and STM32 register regression tests
+  loader-integration:
+    name: Integration through dmod_loader
     runs-on: ubuntu-latest
+    container:
+      image: chocotechnologies/dmod:1.0.4
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Build and run production-code host tests
+      - name: Build native modules
         run: |
-          cmake -S tests/host -B build-host -DCMAKE_BUILD_TYPE=Debug
+          cmake -S . -B build-host -DDMI2C_HOST_TESTS=ON -DDMOD_CPU_FAMILY=x86_64
           cmake --build build-host --parallel 2
+      - name: Install real runtime dependencies and run loader tests
+        run: |
+          export DMOD_DMF_DIR="$PWD/build-host/dmf"
+          dmf-get install -d tests/runtime.dmd -y
           ctest --test-dir build-host --output-on-failure
 
   discover-cpu-families:

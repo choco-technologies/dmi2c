@@ -1,7 +1,8 @@
 # Board configurations
 
 These are dmdevfs INIs, with actual GPIO routing and the bus in one file.
-GPIO sections precede the bus and use AF4/open-drain. Copy the selected file
+GPIO sections use driver_order=10, the bus uses 11 (after SDRAM setup),
+and GPIOs use AF4/open-drain. INI numbers are decimal: address=56 means 0x38. Copy the selected file
 into `/configs/drivers/dmi2c/`; do not install all board files simultaneously.
 The default address belongs to each open handle and can be changed with ioctl.
 Do not configure the same peripheral or pins a second time in another driver.

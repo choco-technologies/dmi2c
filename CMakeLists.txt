@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.18)
 
 set(DMOD_CPU_FAMILY "stm32f7" CACHE STRING "Target CPU family")
-include(${CMAKE_CURRENT_SOURCE_DIR}/src/port/${DMOD_CPU_FAMILY}/config.cmake)
+option(DMI2C_HOST_TESTS "Build loader integration tests with a virtual I2C peripheral" OFF)
+if(NOT DMI2C_HOST_TESTS)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/src/port/${DMOD_CPU_FAMILY}/config.cmake)
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -65,9 +68,11 @@ set(DMOD_DIF_IMPLS          )
 dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     # List of source files - can include C and C++ files
     src/dmi2c.c
+    src/config.c
+    src/transfer.c
 )
 
-dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi@>=2.0 dmini)
+dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi@>=2.0 dmini dmosi)
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
