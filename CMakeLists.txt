@@ -67,6 +67,8 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     src/dmi2c.c
 )
 
+dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi@>=2.0 dmini)
+
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -84,3 +86,5 @@ add_subdirectory(src/port)
 target_link_libraries(${DMOD_MODULE_NAME} ${DMOD_MODULE_NAME}_port_if)
 enable_testing()
 add_subdirectory(tests)
+
+add_subdirectory(tools/i2ctest)

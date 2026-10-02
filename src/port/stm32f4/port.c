@@ -4,7 +4,7 @@
 int dmod_init(const Dmod_Config_t *config)
 {
     (void)config;
-    return stm32_i2c_init(true);
+    return stm32_i2c_init(false);
 }
 int dmod_deinit(void)
 {

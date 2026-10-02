@@ -1,54 +1,17 @@
-# #############################################################################
-# 
-# 	This is an example of a simple library module.
-#
-# #############################################################################
-DMOD_DIR=@DMOD_DIR@
-
-# -----------------------------------------------------------------------------
-#  Paths initialization
-# -----------------------------------------------------------------------------
-include $(DMOD_DIR)/paths.mk
-
-# -----------------------------------------------------------------------------
-#   Module configuration
-# -----------------------------------------------------------------------------
-
-# The name of the module
-DMOD_MODULE_NAME=dmi2c
-
-# The version of the module
-DMOD_MODULE_VERSION=0.1
-
-# The name of the author
-DMOD_AUTHOR_NAME=Patryk Kubiak
-
-# The list of C sources
-DMOD_CSOURCES=src/dmi2c.c
-
-# The list of C++ sources
-DMOD_CXXSOURCES=
-
-# The list of include directories
-DMOD_INC_DIRS=include
-
-# The list of libraries to link
-DMOD_LIBS=
-
-# The list of definitions
-DMOD_DEFINITIONS=
-
-# -----------------------------------------------------------------------------
-#   List of MAL interfaces implemented by the module
-# -----------------------------------------------------------------------------
-DMOD_MAL_IMPLS=
-
-# -----------------------------------------------------------------------------
-#   List of DIF interfaces implemented by the module
-# -----------------------------------------------------------------------------
-DMOD_DIF_IMPLS=
-
-# -----------------------------------------------------------------------------
-#   Include the dmod app makefile
-# -----------------------------------------------------------------------------
-include $(DMOD_DMF_LIB_FILE_PATH)
+DMOD_CPU_FAMILY ?= stm32f7
+BUILD_DIR ?= build-$(DMOD_CPU_FAMILY)
+CMAKE_ARGS ?=
+ifneq ($(strip $(DMOD_DIR)),)
+CMAKE_ARGS += -DDMOD_DIR=$(DMOD_DIR)
+endif
+.PHONY: all configure clean test
+all: configure
+	cmake --build $(BUILD_DIR) --parallel 2
+configure:
+	cmake -S . -B $(BUILD_DIR) -DDMOD_CPU_FAMILY=$(DMOD_CPU_FAMILY) $(CMAKE_ARGS)
+clean:
+	cmake --build $(BUILD_DIR) --target clean
+test:
+	cmake -S tests/host -B build-host
+	cmake --build build-host --parallel 2
+	ctest --test-dir build-host --output-on-failure

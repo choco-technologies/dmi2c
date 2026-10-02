@@ -8,3 +8,4 @@ $include https://github.com/choco-technologies/dmi2c/releases/download/vlatest/v
 # real-world reference).
 dmi2c      https://github.com/choco-technologies/dmi2c/releases/download/v<version>/dmi2c-v<version>-<cpu_family>.zip
 dmi2c_port https://github.com/choco-technologies/dmi2c/releases/download/v<version>/dmi2c_port-v<version>-<cpu_family>.zip
+i2ctest    https://github.com/choco-technologies/dmi2c/releases/download/v<version>/i2ctest-v<version>-<cpu_family>.zip

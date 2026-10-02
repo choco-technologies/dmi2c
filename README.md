@@ -1,128 +1,83 @@
 # dmi2c
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/choco-technologies/dmi2c/actions/workflows/ci.yml/badge.svg)](https://github.com/choco-technologies/dmi2c/actions/workflows/ci.yml)
+I2C master driver for the DMOD embedded module system, exposed through dmdrvi
+2.0 and dmdevfs. STM32F4 and STM32F7 use their hardware I2C controllers.
 
-dmi2c DMOD library module.
+- Unshifted 7-bit target addresses, Standard-mode (100 kHz) and Fast-mode
+  (400 kHz), synchronous reads, writes, address-only probes and atomic vectors
+  of messages with repeated START.
+- Per-open target addresses, serialized transactions, whole-transaction
+  deadlines, negative errno results, local controller recovery after errors.
+- F4 ACK/POS receive sequences and F7 NBYTES/RELOAD for transfers over 255 bytes.
+- Board INIs for NUCLEO-F401RE/F411RE/F446RE/F767ZI, STM32F4-DISCOVERY and
+  STM32F746G-DISCO, with real GPIO assignments and pull-up requirements.
 
-## Description
+This version is a polling master driver. Slave mode, 10-bit addressing, DMA,
+asynchronous interrupts, SMBus/PEC and GPIO clock-pulse bus recovery are not
+implemented. Reserved/general-call addresses are rejected. Calls require task
+context and a running millisecond uptime clock; configuration assumes stable
+system clocks for the lifetime of the bus. Baudrate is a maximum: conservative
+filter/rise/fall timing may produce a slower clock.
 
-TODO: describe what this module does.
+## Build
 
-## Building
-
-### Using CMake
-
-```bash
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
+```sh
+cmake -S . -B build-f7 -DDMOD_CPU_FAMILY=stm32f7
+cmake --build build-f7 --parallel 2
+cmake -S . -B build-f4 -DDMOD_CPU_FAMILY=stm32f4
+cmake --build build-f4 --parallel 2
 ```
 
-Pass `-DDMOD_DIR=/path/to/local/dmod` to build against a local dmod checkout
-instead of fetching `develop` from GitHub.
+Optionally pass `-DDMOD_DIR=/path/to/dmod`. CMake otherwise fetches the SDK from
+its `develop` branch. Generated modules are under `build-f*/dmf/`; release
+packages include headers, documentation and board configurations. `make`
+wraps these CMake targets; `make DMOD_CPU_FAMILY=stm32f4` selects F4.
+Dependencies are dynamically linked DMOD modules, with no bundled HAL.
 
-### Using Make
+## Use
 
-```bash
-make DMOD_MODE=DMOD_MODULE DMOD_DIR=/path/to/dmod
+Install `dmi2c` and the matching `dmi2c_port`, then select a file from
+[configs/board](configs/README.md) for `/configs/drivers/dmi2c/`.
+GPIO setup belongs to `dmgpio`/dmdevfs. For STM32F746G-DISCO's onboard touch bus:
+
+```text
+i2ctest /dev/dmi2cx/touch_i2c probe 0x38
+i2ctest /dev/dmi2cx/touch_i2c read 0x38 0xa8 1
+i2ctest /dev/dmi2cx/touch_i2c ft5336
 ```
 
-## Testing
+See [API](docs/api-reference.md), [configuration](docs/configuration.md),
+[ports](docs/port-implementation.md) and [hardware tool](tools/i2ctest/README.md).
 
-Tests are built automatically alongside the module (see `tests/`). Once built,
-run them with `ctest`:
+## Tests
 
-```bash
-cd build
-ctest --output-on-failure
+Host regression tests compile the production core and both register engines,
+using mocked module services and a register-side peripheral model:
+
+```sh
+cmake -S tests/host -B build-host
+cmake --build build-host
+ctest --test-dir build-host --output-on-failure
 ```
 
-`ctest` installs the test module's dependencies with `dmf-get` and then runs
-it through `dmod_loader`. To run it manually instead:
+`test_dmi2c.dmf` adds API validation checks runnable on a DMOD target.
+`i2ctest` performs actual device transactions; its FT5336 regression requires
+STM32F746G-DISCO hardware. Host simulation does not validate electrical timing
+or substitute for physical-board coverage. See [test report](docs/testing.md).
 
-```bash
-export DMOD_DMF_DIR=$(pwd)/build/dmf
-dmf-get install -d ${DMOD_DMF_DIR}/test_dmi2c-local.dmd -y
-dmod_loader build/dmf/test_dmi2c.dmf
+## Project structure
+
+```text
+include/                 public core, types and minimal port API
+src/dmi2c.c              INI parsing, handles, dmdrvi contract
+src/validation.h         shared argument validation
+src/port/stm32_common/   clocks, ownership, locking, F4/F7 register engines
+src/port/stm32f4/        12-line family selector and toolchain configuration
+src/port/stm32f7/        12-line family selector and toolchain configuration
+configs/board/          ready-to-install board GPIO and I2C INIs
+configs/mcu/            controller-only defaults
+tests/host/             core and register-protocol regression tests
+tests/dmi2c_test.c       on-target DMOD API tests
+tools/i2ctest/           explicit probe/register read/hardware regression
+docs/                   API, configuration, ports and validation
 ```
-
-## Usage
-
-<TBD>
-
-This library module provides functions that can be used by other modules:
-
-```c
-#include "dmi2c.h"
-```
-
-## API
-
-| Function | Description |
-|----------|-------------|
-| `dmi2c_create()` | Create a new `dmi2c_t` instance. |
-| `dmi2c_destroy()` | Destroy an instance created by `_create()`. |
-| `dmi2c_is_valid()` | Check whether a handle is a valid instance. |
-
-See [include/dmi2c.h](include/dmi2c.h) for the full
-declarations and [docs/api-reference.md](docs/api-reference.md) for the
-complete reference.
-
-## Documentation
-
-See the `docs/` directory:
-
-- **[api-reference.md](docs/api-reference.md)** - Complete API documentation
-
-View documentation using `dmf-man dmi2c`.
-
-## Hardware Port
-
-This module ships two DMOD modules: the architecture-independent
-`dmi2c` and `dmi2c_port`, which contains the
-architecture-specific implementation. The active architecture is selected via
-`DMOD_CPU_FAMILY` (default: `stm32f7`):
-
-```bash
-cmake .. -DDMOD_CPU_FAMILY=stm32f7
-```
-
-See [docs/port-implementation.md](docs/port-implementation.md) for how to add
-another architecture. Port-specific files:
-
-```
-├── include/dmi2c_port.h
-├── src/port/
-│   ├── CMakeLists.txt
-│   └── stm32f7/
-│       ├── config.cmake
-│       └── port.c
-└── dmi2c_port.dmr
-```
-## Project Structure
-
-```
-dmi2c/
-├── docs/              # Documentation (markdown format)
-├── include/           # Public headers
-│   └── dmi2c.h
-├── src/
-│   └── dmi2c.c
-├── tests/
-│   ├── CMakeLists.txt
-│   └── dmi2c_test.c
-├── CMakeLists.txt
-├── Makefile
-├── dmi2c.dmr
-└── manifest.dmm
-```
-
-## Author
-
-Patryk Kubiak
-
-## License
-
-MIT

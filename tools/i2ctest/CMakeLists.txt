@@ -1,0 +1,5 @@
+set(DMOD_DMR_PATH ${CMAKE_CURRENT_SOURCE_DIR}/i2ctest.dmr)
+set(DMOD_STACK_SIZE 2048)
+dmod_add_executable(i2ctest ${PROJECT_VERSION} main.c)
+dmod_link_modules(i2ctest dmdrvi@>=2.0)
+target_include_directories(i2ctest PRIVATE ${CMAKE_SOURCE_DIR}/include)
