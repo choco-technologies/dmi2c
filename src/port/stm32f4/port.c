@@ -68,19 +68,3 @@ DMOD_IRQ_HANDLER(73)
 {
     stm32_i2c_irq(3);
 }
-
-/**
- * @brief I2C4 event interrupt entry.
- */
-DMOD_IRQ_HANDLER(95)
-{
-    stm32_i2c_irq(4);
-}
-
-/**
- * @brief I2C4 error interrupt entry.
- */
-DMOD_IRQ_HANDLER(96)
-{
-    stm32_i2c_irq(4);
-}

@@ -31,3 +31,5 @@ license=./LICENSE => ${destination}/${module}/LICENSE [origin=${repo_dir}/LICENS
 
 # Adding itself
 dmr=./${module}.dmr => ${destination}/${module}/${module}.dmr [origin=${repo_dir}/${module}.dmr]
+
+configs=./configs => ${destination}/${module}/configs [origin=${repo_dir}/configs]

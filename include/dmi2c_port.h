@@ -1,33 +1,46 @@
 #ifndef DMI2C_PORT_H
 #define DMI2C_PORT_H
 
-#include "dmod_types.h"
 #include "dmi2c_port_defs.h"
+#include "dmi2c_types.h"
 
-/*
- * Declare architecture-independent port API functions here, following the
- * dmod_dmi2c_port_api(version, return_type, _suffix, (args)) pattern,
- * e.g.:
- *
- *   dmod_dmi2c_port_api(1.0, int, _configure, ( int some_arg ) );
- *
- * Each declaration here must have a matching *definition* in
- * src/port/<arch>/port.c (or a shared src/port/<arch>_common/ file), written
- * with the dmod_dmi2c_port_api_declaration(...) macro instead:
- *
- *   dmod_dmi2c_port_api_declaration(1.0, int, _configure, ( int some_arg ) )
- *   {
- *       ...
- *   }
- *
- * Note this is a *different* mechanism from the dmod_init()/dmod_deinit()
- * module lifecycle hooks already defined in port.c - don't declare `_init`/
- * `_deinit` here too, that name collides with the lifecycle hooks and (unlike
- * them) requires an explicit dmod_dmi2c_port_api_declaration(...)
- * definition to avoid an undefined-reference link error.
- *
- * See dmfmc/include/dmfmc_port.h and dmfmc/src/port/stm32_common/stm32_common.c
- * for a fully worked example.
+/**
+ * @brief Report completion of one message; callable from interrupt context.
  */
+typedef void (*dmi2c_completion_t)(void *user, int result);
+
+/**
+ * @brief Claim and configure hardware; callback remains valid until deinit.
+ */
+dmod_dmi2c_port_api(1.0, int, _init,
+                    (uint8_t instance, uint32_t baudrate, dmi2c_completion_t completion,
+                     void *user));
+
+/**
+ * @brief Disable interrupts, detach the callback and release the controller.
+ */
+dmod_dmi2c_port_api(1.0, void, _deinit, (uint8_t instance));
+
+/** @brief Start one borrowed message; completion fires once after acceptance.
+ * last requests STOP; otherwise leave hardware ready for repeated START.
+ * A negative return means the message was not accepted and no callback follows.
+ */
+dmod_dmi2c_port_api(1.0, int, _start,
+                    (uint8_t instance, const dmi2c_message_t *message, bool last));
+
+/**
+ * @brief Report physical BUSY or a pending STOP without waiting.
+ */
+dmod_dmi2c_port_api(1.0, bool, _is_busy, (uint8_t instance));
+
+/** @brief Stop IRQ access to borrowed buffers and request STOP if still master.
+ * This is synchronous and prevents any further callback for the cancelled message.
+ */
+dmod_dmi2c_port_api(1.0, void, _cancel, (uint8_t instance));
+
+/**
+ * @brief Restore peripheral configuration after cancellation; never wait.
+ */
+dmod_dmi2c_port_api(1.0, int, _recover, (uint8_t instance));
 
 #endif // DMI2C_PORT_H
