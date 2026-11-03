@@ -43,6 +43,17 @@ static void join_worker(unsigned index)
 }
 
 /**
+ * @brief The pads of the controller are fixed by the alternate function of the pin (dmgpio).
+ */
+dmod_dmi2c_port_api_declaration(1.0, int, _set_pins, (uint8_t instance, int scl_pin, int sda_pin))
+{
+    (void)instance;
+    (void)scl_pin;
+    (void)sda_pin;
+    return -ENOTSUP;
+}
+
+/**
  * @brief Claim a virtual controller; exercise duplicate ownership rejection.
  */
 dmod_dmi2c_port_api_declaration(1.0, int, _init,

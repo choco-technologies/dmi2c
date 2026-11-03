@@ -16,6 +16,7 @@ Do not configure the same peripheral or pins a second time in another driver.
 | STM32F746G-DISCO | I2C1 | PB8 / PB9 | CN5 D15 / D14 |
 | STM32F746G-DISCO | I2C3 | PH7 / PH8 | LCD FT5336 (0x38), audio WM8994 (0x1a) |
 | STM32F4-DISCOVERY | I2C1 | PB6 / PB9 | CS43L22 (0x4a), release PD4 reset separately |
+| Waveshare ESP32-S3-Touch-LCD-2.8 | I2C0 (instance 1) | GPIO10 / GPIO11 | PCF85063 RTC (0x51), QMI8658 IMU (0x6b); the touch controller did not answer at 0x15, 0x1a, 0x38 |
 
 Extension headers need an external target and pull-ups to 3.3 V, typically
 2.2–4.7 kOhm as appropriate to bus capacitance. Internal GPIO pull-ups do not

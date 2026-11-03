@@ -1,7 +1,7 @@
 # dmi2c
 
 I2C master driver for the DMOD embedded module system, exposed through dmdrvi
-2.0 and dmdevfs. STM32F4 and STM32F7 use their hardware I2C controllers.
+2.0 and dmdevfs. STM32F4, STM32F7 and ESP32-S3 use their hardware I2C controllers.
 
 - Unshifted 7-bit target addresses, Standard-mode (100 kHz) and Fast-mode
   (400 kHz), synchronous reads, writes, address-only probes and atomic vectors
@@ -67,6 +67,7 @@ src/validation.h         shared argument validation
 src/port/stm32_common/   RCC/NVIC and selected F4/F7 IRQ engine
 src/port/stm32f4/        IRQ/lifecycle entries and toolchain configuration
 src/port/stm32f7/        IRQ/lifecycle entries and toolchain configuration
+src/port/esp32s3/        the two controllers of the ESP32-S3 (master; pads through the GPIO matrix: scl_pin, sda_pin)
 configs/board/          ready-to-install board GPIO and I2C INIs
 configs/mcu/            controller-only defaults
 tests/virtual_port/     test-only loadable hardware model

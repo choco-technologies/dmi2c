@@ -28,3 +28,10 @@ bool i2c_parse_config(dmini_context_t ini, dmi2c_config_t *config)
     config->timeout_ms = (uint32_t)timeout;
     return i2c_config_valid(config);
 }
+
+bool i2c_parse_pins(dmini_context_t ini, int *scl_pin, int *sda_pin)
+{
+    *scl_pin = dmini_get_int(ini, NULL, "scl_pin", -1);
+    *sda_pin = dmini_get_int(ini, NULL, "sda_pin", -1);
+    return *scl_pin >= -1 && *scl_pin <= 255 && *sda_pin >= -1 && *sda_pin <= 255;
+}

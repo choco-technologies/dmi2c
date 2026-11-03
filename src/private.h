@@ -17,6 +17,8 @@ struct dmdrvi_context
 {
     uint32_t magic;
     dmi2c_config_t config;
+    int scl_pin; /* Pads for the chips that route the signals freely (-1: not given) */
+    int sda_pin;
     dmosi_mutex_t lock;
     dmosi_semaphore_t completion;
     volatile int result;
@@ -36,6 +38,11 @@ struct i2c_handle
  * @brief Read and validate dmdevfs's active INI section using dmini.
  */
 bool i2c_parse_config(dmini_context_t ini, dmi2c_config_t *config);
+
+/**
+ * @brief Read scl_pin and sda_pin (-1 when not given); false for a negative or too large value.
+ */
+bool i2c_parse_pins(dmini_context_t ini, int *scl_pin, int *sda_pin);
 
 /**
  * @brief Create OS resources and claim the port; unwind on failure.

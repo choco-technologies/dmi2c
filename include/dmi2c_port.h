@@ -10,6 +10,15 @@
 typedef void (*dmi2c_completion_t)(void *user, int result);
 
 /**
+ * @brief Route the SCL and SDA signals of the controller to pads (the chips that route them freely, e.g. the GPIO matrix).
+ * Called before dmi2c_port_init() when the configuration names a pad (scl_pin, sda_pin); -1 leaves a signal as it is.
+ * The ports of the chips whose pads are fixed by the alternate function of the pin (dmgpio) return -ENOTSUP.
+ *
+ * @return 0 on success, -EINVAL for a pad the chip does not have, -ENOTSUP
+ */
+dmod_dmi2c_port_api(1.0, int, _set_pins, (uint8_t instance, int scl_pin, int sda_pin));
+
+/**
  * @brief Claim and configure hardware; callback remains valid until deinit.
  */
 dmod_dmi2c_port_api(1.0, int, _init,
