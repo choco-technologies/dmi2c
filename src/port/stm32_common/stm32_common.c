@@ -118,6 +118,17 @@ void stm32_i2c_irq(uint8_t instance)
 }
 
 /**
+ * @brief The pads of the controller are fixed by the alternate function of the pin (dmgpio).
+ */
+dmod_dmi2c_port_api_declaration(1.0, int, _set_pins, (uint8_t instance, int scl_pin, int sda_pin))
+{
+    (void)instance;
+    (void)scl_pin;
+    (void)sda_pin;
+    return -ENOTSUP;
+}
+
+/**
  * @brief Claim RCC ownership, preserve the clock selector and enable IRQs.
  */
 dmod_dmi2c_port_api_declaration(1.0, int, _init,

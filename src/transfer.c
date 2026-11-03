@@ -41,8 +41,19 @@ int i2c_bus_create(dmdrvi_context_t context)
         return -ENOMEM;
     }
 
-    int result = dmi2c_port_init(context->config.instance, context->config.baudrate,
-                                 message_complete, context);
+    int result = 0;
+    if (context->scl_pin >= 0 || context->sda_pin >= 0)
+    {
+        result = dmi2c_port_set_pins(context->config.instance, context->scl_pin, context->sda_pin);
+        if (result != 0)
+        {
+            Dmod_Printf("dmi2c: scl_pin=%d sda_pin=%d refused (%d)\n", context->scl_pin, context->sda_pin, result);
+        }
+    }
+    if (result == 0)
+    {
+        result = dmi2c_port_init(context->config.instance, context->config.baudrate, message_complete, context);
+    }
     if (result != 0)
     {
         dmosi_semaphore_destroy(context->completion);

@@ -47,7 +47,8 @@ dmod_dmdrvi_dif_api_declaration(2.0, dmi2c, dmdrvi_context_t, _create,
     }
     memset(context, 0, sizeof(*context));
     context->magic = DMI2C_CONTEXT_MAGIC;
-    if (!i2c_parse_config(config, &context->config) || i2c_bus_create(context))
+    if (!i2c_parse_config(config, &context->config) ||
+        !i2c_parse_pins(config, &context->scl_pin, &context->sda_pin) || i2c_bus_create(context))
     {
         Dmod_Free(context);
         return NULL;

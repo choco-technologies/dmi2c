@@ -1,0 +1,15 @@
+dmi2c on the Waveshare ESP32-S3-Touch-LCD-2.8 (ESP32-S3FN16R8), 2026-11-03
+Firmware: dmod-boot feature/esp32-s3, dmi2c and dmi2c_port as modules (in the external RAM), configs/board/esp32s3-lcd28/i2c.ini
+Bus: I2C0, SCL = GPIO10, SDA = GPIO11, 100 kHz, the board's pull-ups
+
+i2ctest /dev/dmi2cx/i2c probe 0x51   -> 0        (PCF85063 RTC)
+i2ctest /dev/dmi2cx/i2c probe 0x6b   -> 0        (QMI8658 IMU)
+i2ctest /dev/dmi2cx/i2c probe 0x6a, 0x1a, 0x15, 0x38, 0x77 -> -6 (ENXIO: NACK)
+i2ctest /dev/dmi2cx/i2c read 0x6b 0x00 1     -> 05   (QMI8658 WHO_AM_I)
+i2ctest /dev/dmi2cx/i2c read 0x6b 0x00 2, 3  -> 05 05 [05]
+i2ctest /dev/dmi2cx/i2c read 0x51 0x00 20    -> 00 00 02 00 89 34 11 02 00 01 00 80 80 80 80 80 00 18 00 00  (control, time, alarm registers: the pointer increments)
+i2ctest /dev/dmi2cx/i2c read 0x51 0x04 3     -> 89 34 11 (seconds, minutes, hours)
+i2ctest /dev/dmi2cx/i2c read 0x6b 0x00 100   -> 100 bytes, no error (4 chunks of the FIFO)
+
+Not validated: I2C1 (instance 2), 400 kHz, writes (the chunks of a write; only the register pointer writes of "read" were run), arbitration
+loss, a clock-stretching target, the touch controller (CST3530 did not answer at the addresses tried: it probably needs its reset / INT pins).

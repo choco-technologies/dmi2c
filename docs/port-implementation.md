@@ -48,3 +48,16 @@ waveform frequency. Recreate the bus after system-clock changes.
 
 Hardware reference: ST RM0090 (F4) and RM0385 (F74/F75). IRQ mapping was checked
 against [ST's CMSIS stm32f746xx.h](https://raw.githubusercontent.com/STMicroelectronics/cmsis-device-f7/master/Include/stm32f746xx.h). The board routing sources are in configs/README.md.
+
+## ESP32-S3
+
+`src/port/esp32s3/port.c`: the master of the two controllers (I2C0 = instance 1, I2C1 = instance 2) on the XTAL clock. The
+controller runs a list of up to 8 commands (RSTART, WRITE n, READ n, STOP, END) from a FIFO of 32 bytes, so a message is cut
+into chunks: a chunk ends with END (SCL held low until the next list: the next chunk or the repeated START of the next message)
+or, for the last message, with STOP. The interrupt of the end of the list (END_DETECT, TRANS_COMPLETE) takes the received bytes
+and programs the next chunk or reports the message; NACK, arbitration loss and the time-outs end it with -ENXIO, -EAGAIN, -EIO
+like the STM32 ports. A read ends with NACK on its last byte. The bus timing is computed as the HAL of ESP-IDF does.
+
+There are no fixed pads: `dmi2c_port_set_pins()` (the keys `scl_pin`, `sda_pin`) routes the signals through the GPIO matrix,
+open-drain with the internal pull-up on. The interrupts are the CPU lines 4 (I2C0) and 5 (I2C1). Not done: slave mode, 10-bit
+addresses, the fractional divider.

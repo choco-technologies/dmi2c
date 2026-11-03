@@ -19,6 +19,8 @@ set(DMOD_DMR_PATH           ${CMAKE_SOURCE_DIR}/dmi2c_port.dmr)
 # Hardware port selection; the virtual peripheral is only built for loader tests.
 if(DMI2C_HOST_TESTS)
     set(PORT_SOURCES ${CMAKE_SOURCE_DIR}/tests/virtual_port/port.c)
+elseif(DMOD_CPU_FAMILY STREQUAL "esp32s3")
+    set(PORT_SOURCES esp32s3/port.c)
 else()
     set(PORT_SOURCES
         ${DMOD_CPU_FAMILY}/port.c
@@ -48,7 +50,7 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
 
 # dmosi supplies the RTOS-safe IRQ priority; synchronization belongs to the core.
 dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi@>=2.0 dmosi)
-if(NOT DMI2C_HOST_TESTS)
+if(NOT DMI2C_HOST_TESTS AND NOT DMOD_CPU_FAMILY STREQUAL "esp32s3")
     target_compile_definitions(${DMOD_MODULE_NAME} PRIVATE DMI2C_IP_VERSION=${I2C_IP_VERSION})
     dmod_link_modules(${DMOD_MODULE_NAME} dmclk_port@1.1.1)
 endif()
