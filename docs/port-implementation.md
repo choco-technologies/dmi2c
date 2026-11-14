@@ -56,7 +56,10 @@ controller runs a list of up to 8 commands (RSTART, WRITE n, READ n, STOP, END) 
 into chunks: a chunk ends with END (SCL held low until the next list: the next chunk or the repeated START of the next message)
 or, for the last message, with STOP. The interrupt of the end of the list (END_DETECT, TRANS_COMPLETE) takes the received bytes
 and programs the next chunk or reports the message; NACK, arbitration loss and the time-outs end it with -ENXIO, -EAGAIN, -EIO
-like the STM32 ports. A read ends with NACK on its last byte. The bus timing is computed as the HAL of ESP-IDF does.
+like the STM32 ports. A read ends with NACK on its last byte. The bus timing is computed as the HAL of ESP-IDF does, except for the
+time a target may hold SCL low (clock stretching): the controller waits the longest it can count (2^22 cycles of the 40 MHz clock, about
+105 ms), since the deadline that matters is the one of the whole transfer (`timeout_ms`). A gauge like the BQ27220 stretches for
+hundreds of microseconds, which a bound of a few bit times turns into a time-out of every transfer.
 
 There are no fixed pads: `dmi2c_port_set_pins()` (the keys `scl_pin`, `sda_pin`) routes the signals through the GPIO matrix,
 open-drain with the internal pull-up on. The interrupts are the CPU lines 4 (I2C0) and 5 (I2C1). Not done: slave mode, 10-bit
