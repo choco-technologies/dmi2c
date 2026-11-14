@@ -130,16 +130,10 @@ static void fifo_reset(unsigned index)
     *creg(index, I2C_FIFO_CONF_REG) &= ~(I2C_FIFO_RX_RST | I2C_FIFO_TX_RST);
 }
 
-static uint32_t bit_length(uint32_t value)
-{
-    uint32_t n = 0;
-    while (value != 0U)
-    {
-        n++;
-        value >>= 1;
-    }
-    return n;
-}
+/* How long a target may hold SCL low (clock stretching): 2^22 cycles of the 40 MHz clock, ~105 ms - the longest the controller counts. A
+ * gauge such as the BQ27220 stretches for hundreds of microseconds; a bound of a few bit times (the usual guess) ends every such transfer
+ * with a timeout. The bound that matters is the deadline of the whole transfer (timeout_ms of the configuration), which the driver keeps. */
+#define I2C_TO_STRETCH_MAX      22UL
 
 /* The clock and the timing of the bus from the XTAL (the same arithmetic as the HAL of ESP-IDF: bus frequency -> divider, periods) */
 static void bus_timing(unsigned index, uint32_t bus_hz)
@@ -151,7 +145,6 @@ static void bus_timing(unsigned index, uint32_t bus_hz)
     uint32_t high = half - wait_high;
     uint32_t hold = half / 4U;
     uint32_t sample = half / 2U;
-    uint32_t tout = bit_length(5U * half) + 2U;
 
     *creg(index, I2C_CLK_CONF_REG) = (clkm_div - 1U) | I2C_CLK_SCLK_ACTIVE;          /* source 0: the XTAL, no fraction */
     *creg(index, I2C_SCL_LOW_PERIOD_REG) = half - 1U;
@@ -162,7 +155,7 @@ static void bus_timing(unsigned index, uint32_t bus_hz)
     *creg(index, I2C_SCL_STOP_SETUP_REG) = half - 1U;
     *creg(index, I2C_SCL_START_HOLD_REG) = half - 1U;
     *creg(index, I2C_SCL_STOP_HOLD_REG) = half - 1U;
-    *creg(index, I2C_TO_REG) = (tout & I2C_TO_VALUE_M) | I2C_TO_EN;
+    *creg(index, I2C_TO_REG) = I2C_TO_STRETCH_MAX | I2C_TO_EN;
     *creg(index, I2C_FILTER_CFG_REG) = 7U | (7U << 4) | I2C_FILTER_SCL_EN | I2C_FILTER_SDA_EN;
 }
 
