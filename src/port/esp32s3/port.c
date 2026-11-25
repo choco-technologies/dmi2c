@@ -64,15 +64,25 @@ static bool instance_valid(uint8_t instance)
     return instance >= 1U && instance <= ESP32S3_I2C_COUNT;
 }
 
-/* GPIO0-21 and GPIO38-48; GPIO19/20 (USB) and GPIO26-37 (the flash and the PSRAM of the module) are not for the user */
+/*
+ * GPIO0-21 and GPIO38-48; GPIO26-37 (the flash and the PSRAM of the module) are not for the user. GPIO19/20 are the pads of the USB
+ * Serial/JTAG of the chip: a board that does not wire a USB connector to them (the Elecrow DIS08070H: I2C of the touch panel) uses them as
+ * ordinary pads, route_pad() takes them away from the USB.
+ */
 static bool pad_valid(int pad)
 {
-    return (pad >= 0 && pad <= 18) || (pad == 21) || (pad >= 38 && pad <= 48);
+    return (pad >= 0 && pad <= 21) || (pad >= 38 && pad <= 48);
 }
 
 /** A pad as an open-drain GPIO of the matrix with the input on: a bidirectional signal */
 static void route_pad(int pad, uint32_t signal)
 {
+    if (pad == 19 || pad == 20)
+    {
+        /* The pads of the USB become GPIO: the pad driver of the USB Serial/JTAG goes off; its registers need its clock */
+        *reg(ESP32S3_PERIP_CLK_EN1_REG) |= ESP32S3_USB_DEVICE_CLK_BIT;
+        *reg(ESP32S3_USB_SERIAL_JTAG_CONF0_REG) &= ~ESP32S3_USB_PAD_ENABLE;
+    }
     volatile uint32_t *mux = reg(ESP32S3_IO_MUX_REG((uint32_t)pad));
     *mux = (*mux & ~ESP32S3_IO_MUX_MCU_SEL_M) | (ESP32S3_IO_MUX_FUNC_GPIO << ESP32S3_IO_MUX_MCU_SEL_S) | ESP32S3_IO_MUX_IE |
            ESP32S3_IO_MUX_PU;

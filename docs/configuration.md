@@ -23,7 +23,7 @@ timeout_ms=100
 | `address` | 80 | Decimal 8..119, ordinary unshifted 7-bit addresses |
 | `baudrate` | 100000 | 100000, 400000 Hz |
 | `timeout_ms` | 100 | 1..60000 ms per complete transfer |
-| `scl_pin`, `sda_pin` | -1 | Pads of the signals, for the chips that route them freely (ESP32-S3: GPIO matrix; required there, the pad numbers are GPIO numbers; GPIO19/20 and GPIO26-37 are refused). The chips whose pads are fixed by the alternate function of the pin (STM32, set up with dmgpio) refuse the keys |
+| `scl_pin`, `sda_pin` | -1 | Pads of the signals, for the chips that route them freely (ESP32-S3: GPIO matrix; required there, the pad numbers are GPIO numbers; GPIO26-37 are refused; GPIO19/20 are the pads of the USB: they are taken away from it, so use them only when no USB connector is wired to them). The chips whose pads are fixed by the alternate function of the pin (STM32, set up with dmgpio) refuse the keys |
 
 Values are read through dmini_get_int; use decimal integers in INI files.
 The driver validates supported ranges before narrowing fields. It does not
