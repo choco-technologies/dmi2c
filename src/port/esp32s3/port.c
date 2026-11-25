@@ -79,8 +79,9 @@ static void route_pad(int pad, uint32_t signal)
 {
     if (pad == 19 || pad == 20)
     {
-        /* The pads of the USB become GPIO: the pad driver of the USB Serial/JTAG goes off; its registers need its clock */
-        *reg(ESP32S3_PERIP_CLK_EN1_REG) |= ESP32S3_USB_DEVICE_CLK_BIT;
+        /* The pads of the USB become GPIO: the pad driver of the USB Serial/JTAG goes off; its registers need its clock and no reset */
+        *reg(ESP32S3_PERIP_CLK_EN1_REG) |= ESP32S3_USB_DEVICE_BIT;
+        *reg(ESP32S3_PERIP_RST_EN1_REG) &= ~ESP32S3_USB_DEVICE_BIT;
         *reg(ESP32S3_USB_SERIAL_JTAG_CONF0_REG) &= ~ESP32S3_USB_PAD_ENABLE;
     }
     volatile uint32_t *mux = reg(ESP32S3_IO_MUX_REG((uint32_t)pad));

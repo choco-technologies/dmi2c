@@ -7,7 +7,7 @@ i2ctest /dev/dmi2cx/i2c probe 0x08 ... 0x77 (every address) -> 0 at 0x18 and 0x5
   0x5d  GT911 (the touch controller; the 0x14 of the V2 boards is not on this bus: the INT line selects the address while it is reset)
 
 GPIO19/20 as I2C: the pad driver of the USB Serial/JTAG has to be switched off (USB_SERIAL_JTAG_CONF0.USB_PAD_ENABLE), otherwise every
-transfer ends with -116 (ETIMEDOUT) - the port does it in route_pad(), after it enabled the clock of the USB device (without the clock the
-write to the register stalls the CPU: the board stops during the start).
+transfer ends with -116 (ETIMEDOUT) - the port does it in route_pad(), after it enabled the clock of the USB device and released its
+reset (PERIP_CLK_EN1 / PERIP_RST_EN1 bit 10). Clearing the bit without that stopped the board during the start (the write stalled the CPU).
 
 Not validated: 400 kHz, writes, the second controller (instance 2).

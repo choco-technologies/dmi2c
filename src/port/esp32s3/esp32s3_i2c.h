@@ -95,8 +95,9 @@
 #define ESP32S3_GPIO_IN_SEL_ROUTED      (1UL << 7)
 /* USB Serial/JTAG: its pad driver on GPIO19/20 (D-, D+) has to be off for these to be GPIO */
 #define ESP32S3_USB_SERIAL_JTAG_CONF0_REG 0x60038018UL
-#define ESP32S3_PERIP_CLK_EN1_REG       (ESP32S3_SYSTEM_BASE + 0x20UL)
-#define ESP32S3_USB_DEVICE_CLK_BIT      (1UL << 10)
+#define ESP32S3_PERIP_CLK_EN1_REG       (ESP32S3_SYSTEM_BASE + 0x1CUL)
+#define ESP32S3_PERIP_RST_EN1_REG       (ESP32S3_SYSTEM_BASE + 0x24UL)
+#define ESP32S3_USB_DEVICE_BIT          (1UL << 10)    /* USB_DEVICE_CLK_EN / USB_DEVICE_RST */
 #define ESP32S3_USB_PAD_ENABLE          (1UL << 14)
 #define ESP32S3_IO_MUX_REG(pad)         (0x60009004UL + 4UL * (pad))
 #define ESP32S3_IO_MUX_PU               (1UL << 8)
