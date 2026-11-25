@@ -1,0 +1,13 @@
+dmi2c on the Elecrow DIS08070H (CrowPanel 7.0", ESP32-S3-WROOM-1-N4R8), 2026-11-25
+Firmware: dmod-boot (elecrow-dis08070h), dmi2c and dmi2c_port as modules, configs/board/elecrow-dis08070h/i2c.ini
+Bus: I2C0, SCL = GPIO20, SDA = GPIO19 (the pads of the USB Serial/JTAG of the chip), 100 kHz, the board's pull-ups
+
+i2ctest /dev/dmi2cx/i2c probe 0x08 ... 0x77 (every address) -> 0 at 0x18 and 0x5d, -6 (ENXIO: NACK) at all the others
+  0x18  PCA9557 (the expander: reset and INT of the touch panel; the board is the V3 revision)
+  0x5d  GT911 (the touch controller; the 0x14 of the V2 boards is not on this bus: the INT line selects the address while it is reset)
+
+GPIO19/20 as I2C: the pad driver of the USB Serial/JTAG has to be switched off (USB_SERIAL_JTAG_CONF0.USB_PAD_ENABLE), otherwise every
+transfer ends with -116 (ETIMEDOUT) - the port does it in route_pad(), after it enabled the clock of the USB device (without the clock the
+write to the register stalls the CPU: the board stops during the start).
+
+Not validated: 400 kHz, writes, the second controller (instance 2).
